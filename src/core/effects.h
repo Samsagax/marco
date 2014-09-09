@@ -63,34 +63,50 @@ typedef enum
  */
 typedef void (* MetaEffectFinished) (gpointer    data);
 
+typedef struct BoxStartEnd BoxStartEnd;
+typedef struct MetaBoxEffect MetaBoxEffect;
+typedef struct MetaBoxEffectPriv MetaBoxEffectPriv;
+
+struct MetaBoxEffect
+{
+  /** The window the effect is applied to. */
+  MetaScreen *screen;
+  /** Which effect is happening here. */
+  MetaEffectType type;
+  /** The effect handler can hang data here. */
+  gpointer info;
+
+  MetaBoxEffectPriv *priv;
+};
+
+
 /**
- * Performs the minimize effect.
+ * Performs the minimize box effect.
  *
- * \param window       The window we're moving
+ * \param screen       The screen of the window we're moving
  * \param window_rect  Its current state
  * \param target       Where it should end up
  * \param finished     Callback for when it's finished
  * \param data         Data for callback
  */
-void        meta_effect_run_minimize     (MetaWindow         *window,
-                                          MetaRectangle	     *window_rect,
-                                          MetaRectangle	     *target,
-                                          MetaEffectFinished  finished,
-                                          gpointer            data);
+void        meta_box_effect_run_minimize     (MetaScreen         *screen,
+                                              MetaRectangle	     *window_rect,
+                                              MetaRectangle	     *icon_rect,
+                                              MetaEffectFinished  finished,
+                                              gpointer            data);
 
 /**
- * Performs the unminimize effect.  There is no such effect.
- * FIXME: delete this.
+ * Performs the unminimize box effect.
  *
- * \param window       The window we're moving
+ * \param screen       The screen of the window we're moving
  * \param icon_rect    Its current state
  * \param window_rect  Where it should end up
  * \param finished     Callback for when it's finished
  * \param data         Data for callback
  */
-void        meta_effect_run_unminimize (MetaWindow         *window,
-                                          MetaRectangle      *window_rect,
+void        meta_box_effect_run_unminimize (MetaScreen         *screen,
                                           MetaRectangle      *icon_rect,
+                                          MetaRectangle      *window_rect,
                                           MetaEffectFinished  finished,
                                           gpointer            data);
 
@@ -102,7 +118,7 @@ void        meta_effect_run_unminimize (MetaWindow         *window,
  * \param finished     Callback for when it's finished
  * \param data         Data for callback
  */
-void        meta_effect_run_close        (MetaWindow         *window,
+void        meta_box_effect_run_close        (MetaScreen         *screen,
                                           MetaEffectFinished  finished,
                                           gpointer            data);
 
@@ -114,7 +130,7 @@ void        meta_effect_run_close        (MetaWindow         *window,
  * \param finished     Callback for when it's finished
  * \param data         Data for callback
  */
-void        meta_effect_run_focus        (MetaWindow         *window,
+void        meta_box_effect_run_focus        (MetaScreen         *screen,
                                           MetaEffectFinished  finished,
                                           gpointer            data);
 

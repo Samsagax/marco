@@ -72,9 +72,6 @@
 
 #include <string.h>
 
-typedef struct MetaEffect MetaEffect;
-typedef struct MetaEffectPriv MetaEffectPriv;
-
 typedef struct
 {
   MetaScreen *screen;
@@ -104,51 +101,18 @@ typedef struct
 
 } BoxAnimationContext;
 
-/**
- * Information we need to know during a maximise or minimise effect.
- */
-typedef struct
+struct MetaBoxEffectPriv
 {
-  /** This is the normal-size window. */
-  MetaRectangle window_rect;
-  /** This is the size of the window when it's an icon. */
-  MetaRectangle icon_rect;
-} MetaMinimizeEffect, MetaUnminimizeEffect;
-
-struct MetaEffectPriv
-{
+  MetaRectangle *start_rect;
+  MetaRectangle *end_rect;
   MetaEffectFinished finished;
   gpointer           finished_data;
 };
 
-struct MetaEffect
-{
-  /** The window the effect is applied to. */
-  MetaWindow *window;
-  /** Which effect is happening here. */
-  MetaEffectType type;
-  /** The effect handler can hang data here. */
-  gpointer info;
-
-  union
-  {
-    MetaMinimizeEffect      minimize;
-    /* ... and theoretically anything else */
-  } u;
-
-  MetaEffectPriv *priv;
-};
-
-static void run_default_effect_handler (MetaEffect *effect);
-static void run_handler (MetaEffect *effect);
-static void effect_free (MetaEffect *effect);
-
-static MetaEffect *
-create_effect (MetaEffectType      type,
-               MetaWindow         *window,
-               MetaEffectFinished  finished,
-               gpointer            finished_data);
-
+/*
+ * Draw a box animation on screen
+ *
+ */
 static void
 draw_box_animation (MetaScreen     *screen,
                     MetaRectangle  *initial_rect,
@@ -158,20 +122,25 @@ draw_box_animation (MetaScreen     *screen,
                     gpointer        finished_data);
 
 /**
- * Creates an effect.
+ * Creates a box effect.
  *
  */
-static MetaEffect*
-create_effect (MetaEffectType      type,
-               MetaWindow         *window,
-               MetaEffectFinished  finished,
-               gpointer            finished_data)
+static MetaBoxEffect*
+create_box_effect (MetaEffectType      type,
+                   MetaScreen         *screen,
+                   MetaRectangle      *start_rect,
+                   MetaRectangle      *end_rect,
+                   MetaEffectFinished  finished,
+                   gpointer            finished_data)
 {
-    MetaEffect *effect = g_new (MetaEffect, 1);
+    MetaBoxEffect *effect = g_new (MetaBoxEffect, 1);
 
     effect->type = type;
-    effect->window = window;
-    effect->priv = g_new (MetaEffectPriv, 1);
+    effect->screen = screen;
+
+    effect->priv = g_new (MetaBoxEffectPriv, 1);
+    effect->priv->start_rect = start_rect;
+    effect->priv->end_rect = end_rect;
     effect->priv->finished = finished;
     effect->priv->finished_data = finished_data;
 
@@ -184,81 +153,121 @@ create_effect (MetaEffectType      type,
  * \param effect  The effect.
  */
 static void
-effect_free (MetaEffect *effect)
+box_effect_free (MetaBoxEffect *effect)
 {
   g_free (effect->priv);
   g_free (effect);
 }
 
-void
-meta_effect_run_focus (MetaWindow	    *window,
-		       MetaEffectFinished   finished,
-		       gpointer		    data)
+/**
+ * BoxEffect default handler
+ *
+ */
+static void
+run_box_effect_handler (MetaBoxEffect *effect)
 {
-    MetaEffect *effect;
+  if (meta_prefs_get_mate_animations())
+  {
+    switch (effect->type)
+    {
+    case META_EFFECT_MINIMIZE:
+       draw_box_animation (effect->screen,
+                     effect->priv->start_rect,
+                     effect->priv->end_rect,
+                     META_MINIMIZE_ANIMATION_LENGTH,
+                     effect->priv->finished,
+                     effect->priv->finished_data);
+       break;
+    case META_EFFECT_UNMINIMIZE:
+       draw_box_animation (effect->screen,
+                     effect->priv->start_rect,
+                     effect->priv->end_rect,
+                     META_UNMINIMIZE_ANIMATION_LENGTH,
+                     effect->priv->finished,
+                     effect->priv->finished_data);
+       break;
 
-    g_return_if_fail (window != NULL);
+    default:
+       break;
+    }
+  }
+  else
+  {
+    /* If effects are disabled just run the finished function */
+    if (effect->priv->finished)
+      effect->priv->finished(effect->priv->finished_data);
+  }
 
-    effect = create_effect (META_EFFECT_FOCUS, window, finished, data);
-
-    run_handler (effect);
+  box_effect_free (effect);
 }
 
 void
-meta_effect_run_minimize (MetaWindow         *window,
+meta_box_effect_run_focus (MetaScreen	    *screen,
+		       MetaEffectFinished   finished,
+		       gpointer		    data)
+{
+    MetaBoxEffect *effect;
+
+    g_return_if_fail (screen != NULL);
+
+    effect = create_box_effect (META_EFFECT_FOCUS, screen, NULL, NULL, finished, data);
+
+    run_box_effect_handler (effect);
+}
+
+void
+meta_box_effect_run_minimize (MetaScreen         *screen,
                           MetaRectangle      *window_rect,
                           MetaRectangle      *icon_rect,
                           MetaEffectFinished  finished,
                           gpointer            data)
 {
-    MetaEffect *effect;
+    MetaBoxEffect *effect;
 
-    g_return_if_fail (window != NULL);
+    g_return_if_fail (screen != NULL);
     g_return_if_fail (icon_rect != NULL);
 
-    effect = create_effect (META_EFFECT_MINIMIZE, window, finished, data);
+    effect = create_box_effect (META_EFFECT_MINIMIZE, screen,
+                                  window_rect, icon_rect,
+                                  finished, data);
 
-    effect->u.minimize.window_rect = *window_rect;
-    effect->u.minimize.icon_rect = *icon_rect;
-
-    run_handler (effect);
+    run_box_effect_handler (effect);
 }
 
 void
-meta_effect_run_unminimize (MetaWindow         *window,
+meta_box_effect_run_unminimize (MetaScreen         *screen,
                             MetaRectangle      *window_rect,
                             MetaRectangle      *icon_rect,
                             MetaEffectFinished  finished,
                             gpointer            data)
 {
-    MetaEffect *effect;
+    MetaBoxEffect *effect;
 
-    g_return_if_fail (window != NULL);
+    g_return_if_fail (screen != NULL);
     g_return_if_fail (icon_rect != NULL);
 
-    effect = create_effect (META_EFFECT_UNMINIMIZE, window, finished, data);
+    effect = create_box_effect (META_EFFECT_UNMINIMIZE, screen,
+                                  icon_rect, window_rect,
+                                  finished, data);
 
-    effect->u.minimize.window_rect = *window_rect;
-    effect->u.minimize.icon_rect = *icon_rect;
-
-    run_handler (effect);
+    run_box_effect_handler (effect);
 }
 
 void
-meta_effect_run_close (MetaWindow         *window,
-		       MetaEffectFinished  finished,
-		       gpointer            data)
+meta_box_effect_run_close (MetaScreen         *screen,
+		                       MetaEffectFinished  finished,
+		                       gpointer            data)
 {
-    MetaEffect *effect;
+    MetaBoxEffect *effect;
 
-    g_return_if_fail (window != NULL);
+    g_return_if_fail (screen != NULL);
 
-    effect = create_effect (META_EFFECT_CLOSE, window,
-                            finished, data);
+    effect = create_box_effect (META_EFFECT_CLOSE, screen,
+                                NULL, NULL,
+                                finished, data);
 
-    run_handler (effect);
+    run_box_effect_handler (effect);
 }
-
 
 /* old ugly minimization effect */
 
@@ -715,48 +724,4 @@ meta_effects_end_wireframe (MetaScreen          *screen,
 
   meta_display_ungrab (screen->display);
   meta_ui_pop_delay_exposes (screen->ui);
-}
-
-static void
-run_default_effect_handler (MetaEffect *effect)
-{
-    switch (effect->type)
-    {
-    case META_EFFECT_MINIMIZE:
-       draw_box_animation (effect->window->screen,
-                     &(effect->u.minimize.window_rect),
-                     &(effect->u.minimize.icon_rect),
-                     META_MINIMIZE_ANIMATION_LENGTH,
-                     effect->priv->finished,
-                     effect->priv->finished_data);
-       break;
-    case META_EFFECT_UNMINIMIZE:
-       draw_box_animation (effect->window->screen,
-                     &(effect->u.minimize.icon_rect),
-                     &(effect->u.minimize.window_rect),
-                     META_UNMINIMIZE_ANIMATION_LENGTH,
-                     effect->priv->finished,
-                     effect->priv->finished_data);
-       break;
-
-    default:
-       break;
-    }
-}
-
-static void
-run_handler (MetaEffect *effect)
-{
-  /* If effects are disabled just run the finished function */
-  if (meta_prefs_get_mate_animations ())
-  {
-    run_default_effect_handler (effect);
-  }
-  else
-  {
-    if (effect->priv->finished)
-      effect->priv->finished(effect->priv->finished_data);
-  }
-
-  effect_free (effect);
 }

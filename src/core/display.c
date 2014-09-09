@@ -2209,7 +2209,7 @@ static gboolean event_callback(XEvent* event, gpointer data)
                               "Window %s withdrawn\n",
                               window->desc);
 
-                  meta_effect_run_close (window, NULL, NULL);
+                  /*meta_effect_run_close (window, NULL, NULL);*/
 
                   /* Unmanage withdrawn window */
                   window->withdrawn = TRUE;

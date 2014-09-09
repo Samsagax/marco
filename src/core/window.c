@@ -1489,7 +1489,7 @@ meta_window_animate_minimize (MetaWindow *window)
 
   meta_window_get_outer_rect (window, &window_rect);
 
-  meta_effect_run_minimize (window,
+  meta_box_effect_run_minimize (window->screen,
                             &window_rect,
                             &icon_rect,
                             finish_minimize,
@@ -1518,7 +1518,7 @@ meta_window_animate_unminimize (MetaWindow *window)
 
   meta_window_get_outer_rect (window, &window_rect);
 
-  meta_effect_run_unminimize (window,
+  meta_box_effect_run_unminimize (window->screen,
                             &window_rect,
                             &icon_rect,
                             finish_unminimize,
@@ -4311,7 +4311,7 @@ meta_window_focus (MetaWindow  *window,
   if (window->wm_state_demands_attention)
     meta_window_unset_demands_attention(window);
 
-  meta_effect_run_focus(window, NULL, NULL);
+  meta_box_effect_run_focus(window->screen, NULL, NULL);
 }
 
 static void
